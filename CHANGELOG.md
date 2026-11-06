@@ -28,9 +28,11 @@ Erster veröffentlichter Stand.
   Footer, Favicon aus dem ChipShop-Die-Symbol, Autorenzeile im Banner, eigener
   README-Abschnitt mit Screenshot.
 - Steffes-Industries-Logo korrigiert: statt der zuvor verwendeten Marke jetzt
-  das offizielle Logo aus dem PR-Bestand – „STEFFES" aufrecht mit Unterstrich,
-  „INDUSTRIES" kursiv mit Überstrich (`STEFFES INDUSTRIES LOGO_Schmal.png`
-  schwarz, `..._Weiß.png` weiß). Banner, README und Footer entsprechend neu.
+  das offizielle Logo `google_STI_logo.png` (PR/Logo) – „STEFFES" aufrecht mit
+  Unterstrich, „INDUSTRIES" kursiv mit Überstrich. Die weiße Fassung wird aus
+  dem Alphakanal desselben Logos erzeugt (die Dateien `..._Schmal/_Weiß` im
+  Bestand sind konturierte Varianten und ergeben kein gefülltes Weiß).
+  Banner, README und Footer entsprechend neu.
 - `[hidden] { display: none !important; }` in `style.css`: das Build-Panel ist
   jetzt wirklich versteckt, solange kein Build läuft (`display: flex` hatte das
   `hidden`-Attribut zuvor überschrieben).
