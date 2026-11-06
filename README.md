@@ -61,9 +61,16 @@ das oben rechts an.
 | `tests/test_estimator.py` | Tests für Schätzung und Config-Generierung |
 | `assets/logo.png` | Logo (schwarz/weiß, Cyan-Motiv, 1024×1024) |
 | `assets/hero.png` | Banner dieser README (1024×512) |
+| `assets/screenshot.png` | Screenshot der Oberfläche für diese README |
+| `assets/chipshop-wordmark.png` | ChipShop-Wortmarke, freigestellt |
+| `assets/steffes-industries-black.png` | Steffes-Industries-Wortmarke, schwarz (heller Grund) |
+| `assets/steffes-industries-white.png` | Steffes-Industries-Wortmarke, weiß (dunkler Grund) |
+| `static/img/` | Logos der Oberfläche: Header-Lockup, Footer-Wortmarke, Favicon |
 | `outputs/<job-id>/` | pro Build: `config.scala`, `spec.json`, `build.log`, `verilog/` |
 
 ## Oberfläche
+
+![Screenshot der ChipShop-Oberfläche](assets/screenshot.png)
 
 **Spalte 1 – Grundkonfiguration.** Schnellvorlagen, Anzahl Kerne (Schieberegler
 und Zahlfeld, synchron), Kerntyp (Rocket / BOOM small|medium|large),
@@ -181,6 +188,19 @@ venv/bin/python -m unittest discover -s tests -v
 - Der Build braucht die Chipyard-Conda-Umgebung inkl. `firtool`; der erste
   Build kompiliert Scala und dauert entsprechend lange. Wenn etwas fehlt,
   sagt das Backend, was es erwartet.
+
+## Steffes Industries
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/steffes-industries-white.png">
+  <img alt="Steffes Industries" src="assets/steffes-industries-black.png" height="34">
+</picture>
+
+ChipShop entsteht bei **Steffes Industries** – Raphael Steffes.
+Website: <https://www.steffes.industries>
+
+Die Oberfläche trägt die Marke ebenfalls: das ChipShop-Logo sitzt im Header,
+die Steffes-Industries-Wortmarke mit Verweis auf die Website im Footer.
 
 ## Lizenz
 

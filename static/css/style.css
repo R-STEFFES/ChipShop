@@ -4,6 +4,10 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* `hidden` muss immer greifen -- sonst ueberschreibt eine display-Regel
+   (z. B. .build-panel { display: flex }) das HTML-Attribut. */
+[hidden] { display: none !important; }
+
 :root {
   --primary: #3b82f6;
   --primary-dark: #2563eb;
@@ -62,15 +66,10 @@ header.top {
 
 .brand { display: flex; align-items: center; gap: 14px; }
 
-.logo {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary), #7c3aed);
-  color: #fff;
-  font-size: 22px;
+.brand-logo {
+  display: block;
+  height: 52px;
+  width: auto;
   flex-shrink: 0;
 }
 
@@ -627,6 +626,11 @@ pre.log { max-height: 260px; }
 /* ----------------------------------------------------------- Footer */
 
 footer.bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
   border-top: 1px solid var(--border);
   padding: 12px 22px;
   font-size: 12.5px;
@@ -634,6 +638,16 @@ footer.bottom {
   background: var(--bg-1);
 }
 footer.bottom b { color: var(--text-2); font-weight: 600; }
+
+.powered { display: flex; align-items: center; gap: 12px; }
+
+.powered-logo { display: inline-flex; opacity: 0.8; transition: opacity 0.15s ease; }
+.powered-logo:hover { opacity: 1; }
+.powered-logo img { display: block; height: 19px; width: auto; }
+
+.powered-text { color: var(--text-3); white-space: nowrap; }
+.powered-text a { color: var(--text-2); text-decoration: none; }
+.powered-text a:hover { color: var(--primary); }
 
 /* ------------------------------------------------------------ Toast */
 

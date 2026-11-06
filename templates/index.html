@@ -3,14 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chipyard GUI -- Konfigurator</title>
+<title>ChipShop -- Chipyard-Konfigurator</title>
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
 <header class="top">
   <div class="brand">
-    <span class="logo">&#9635;</span>
+    <img class="brand-logo" src="{{ url_for('static', filename='img/chipshop-logo.png') }}"
+         alt="ChipShop" width="196" height="52">
     <div>
       <h1>Chipyard&nbsp;Konfigurator</h1>
       <p class="sub">Kerne und Module w&auml;hlen &rarr; Layout sch&auml;tzen &rarr; Verilog erzeugen</p>
@@ -141,6 +143,17 @@
 
 <footer class="bottom">
   <span id="foot-est">&ndash;</span>
+  <div class="powered">
+    <a class="powered-logo" href="https://www.steffes.industries" target="_blank" rel="noopener"
+       title="Steffes Industries">
+      <img src="{{ url_for('static', filename='img/steffes-industries-white.png') }}"
+           alt="Steffes Industries" height="19">
+    </a>
+    <span class="powered-text">
+      Raphael Steffes &middot;
+      <a href="https://www.steffes.industries" target="_blank" rel="noopener">www.steffes.industries</a>
+    </span>
+  </div>
 </footer>
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>

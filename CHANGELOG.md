@@ -23,5 +23,12 @@ Erster veröffentlichter Stand.
 - Logo `assets/logo.png` (1024×1024) und README-Banner `assets/hero.png`
   (1024×512) im Steffes-Industries-Stil: schwarz, weiße kursive Wortmarke mit
   Überstrich und Speed-Slash, Cyan #00E5FF.
+- Markenauftritt durchgezogen: ChipShop-Lockup im Header der Oberfläche,
+  kleine Steffes-Industries-Wortmarke mit Link auf www.steffes.industries im
+  Footer, Favicon aus dem STI-Monogramm, Autorenzeile im Banner, eigener
+  README-Abschnitt mit Screenshot.
+- `[hidden] { display: none !important; }` in `style.css`: das Build-Panel ist
+  jetzt wirklich versteckt, solange kein Build läuft (`display: flex` hatte das
+  `hidden`-Attribut zuvor überschrieben).
 
 [0.0.1]: https://github.com/R-STEFFES/ChipShop/releases/tag/v0.0.1
