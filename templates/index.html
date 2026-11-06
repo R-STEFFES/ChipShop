@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chipyard GUI -- Konfigurator</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="logo">&#9635;</span>
+    <div>
+      <h1>Chipyard&nbsp;Konfigurator</h1>
+      <p class="sub">Kerne und Module w&auml;hlen &rarr; Layout sch&auml;tzen &rarr; Verilog erzeugen</p>
+    </div>
+  </div>
+  <div class="chipyard-info" id="chipyard-info">
+    <span class="loading">Chipyard wird geladen ...</span>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ================= Spalte 1: Konfiguration ================= -->
+  <section class="col col-config">
+    <h2>1&nbsp;&middot;&nbsp;Grundkonfiguration</h2>
+
+    <h3>Schnellvorlagen</h3>
+    <div class="preset-row" id="preset-row"></div>
+
+    <div class="field">
+      <label for="cores">Anzahl Kerne</label>
+      <div class="slider-row">
+        <input type="range" id="cores" min="1" max="16" value="1" step="1">
+        <input type="number" id="cores-num" min="1" max="16" value="1">
+      </div>
+      <p class="hint" id="cores-hint"></p>
+    </div>
+
+    <div class="field">
+      <label for="core-type">Kerntyp</label>
+      <select id="core-type"></select>
+      <p class="hint" id="core-type-hint"></p>
+    </div>
+
+    <div class="field">
+      <label for="pdk">Fertigungs-Preset (PDK)</label>
+      <select id="pdk"></select>
+      <p class="hint" id="pdk-hint"></p>
+    </div>
+
+    <div class="field">
+      <label for="l2">L2&nbsp;/&nbsp;LLC-Gr&ouml;&szlig;e</label>
+      <select id="l2"></select>
+    </div>
+
+    <h3>Module</h3>
+    <div id="modules"></div>
+
+    <details class="advanced">
+      <summary>Erweitert</summary>
+      <div class="field">
+        <label for="rocc">RoCC-Demo-Beschleuniger (Akkumulator)</label>
+        <input type="number" id="rocc" min="0" max="16" value="0">
+        <p class="hint">Jeder Beschleuniger belegt einen Hart.</p>
+      </div>
+      <div class="field">
+        <label for="activity">Aktivit&auml;t (Anteil aktiver Logik)</label>
+        <input type="number" id="activity" min="0.1" max="1" step="0.05" value="1">
+      </div>
+      <div class="field">
+        <label for="cycles">Simulationsl&auml;nge [Mio. Zyklen]</label>
+        <input type="number" id="cycles" min="1" step="10" value="50">
+      </div>
+      <div class="field">
+        <label for="jobs">Build-Parallelit&auml;t (-j)</label>
+        <input type="number" id="jobs" min="1" max="32" value="4">
+      </div>
+    </details>
+  </section>
+
+  <!-- ================= Spalte 2: Layout + Schaetzung =========== -->
+  <section class="col col-layout">
+    <h2>2&nbsp;&middot;&nbsp;Vorab-Layout (grob)</h2>
+    <div class="floorplan-wrap">
+      <svg id="floorplan" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet"></svg>
+      <ul class="legend" id="legend"></ul>
+    </div>
+    <p class="hint" id="layout-summary">&ndash;</p>
+
+    <h2>3&nbsp;&middot;&nbsp;Sch&auml;tzung vor der Simulation</h2>
+    <div class="cards" id="cards"></div>
+
+    <details class="assumptions">
+      <summary>Annahmen der Sch&auml;tzung</summary>
+      <ul id="assumptions"></ul>
+    </details>
+  </section>
+
+  <!-- ================= Spalte 3: Verilog ======================= -->
+  <section class="col col-build">
+    <h2>4&nbsp;&middot;&nbsp;Verilog erzeugen</h2>
+
+    <div class="target">
+      <span class="target-label">Ziel:</span>
+      <code id="target-path">&ndash;</code>
+    </div>
+
+    <div class="btn-row">
+      <button id="btn-config" class="btn">Config anzeigen</button>
+      <button id="btn-write" class="btn">Config ablegen</button>
+      <button id="btn-build" class="btn btn-primary">Verilog bauen</button>
+    </div>
+
+    <div class="warnings" id="warnings" hidden></div>
+
+    <pre class="code" id="config-source" hidden></pre>
+
+    <div class="build-panel" id="build-panel" hidden>
+      <div class="build-head">
+        <span class="badge" id="build-badge">-</span>
+        <span id="build-phase"></span>
+        <span class="spacer"></span>
+        <span id="build-elapsed"></span>
+      </div>
+      <pre class="log" id="build-log"></pre>
+      <div class="btn-row">
+        <a id="btn-zip" class="btn btn-primary" hidden>Verilog-ZIP herunterladen</a>
+        <button id="btn-cancel-view" class="btn" hidden>Ausblenden</button>
+      </div>
+      <ul class="file-list" id="file-list"></ul>
+    </div>
+
+    <h3>Fr&uuml;here L&auml;ufe</h3>
+    <ul class="job-list" id="job-list"><li class="muted">noch keine</li></ul>
+  </section>
+
+</main>
+
+<footer class="bottom">
+  <span id="foot-est">&ndash;</span>
+</footer>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
