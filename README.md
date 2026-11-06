@@ -63,9 +63,9 @@ das oben rechts an.
 | `assets/hero.png` | Banner dieser README (1024×512) |
 | `assets/screenshot.png` | Screenshot der Oberfläche für diese README |
 | `assets/chipshop-wordmark.png` | ChipShop-Wortmarke, freigestellt |
-| `assets/steffes-industries-black.png` | Steffes-Industries-Wortmarke, schwarz (heller Grund) |
-| `assets/steffes-industries-white.png` | Steffes-Industries-Wortmarke, weiß (dunkler Grund) |
-| `static/img/` | Logos der Oberfläche: Header-Lockup, Footer-Wortmarke, Favicon |
+| `assets/steffes-industries-black.png` | Steffes-Industries-Logo, schwarz (heller Grund) |
+| `assets/steffes-industries-white.png` | Steffes-Industries-Logo, weiß (dunkler Grund) |
+| `static/img/` | Logos der Oberfläche: Header-Lockup, Footer-Logo, Favicon |
 | `outputs/<job-id>/` | pro Build: `config.scala`, `spec.json`, `build.log`, `verilog/` |
 
 ## Oberfläche
@@ -200,7 +200,10 @@ ChipShop entsteht bei **Steffes Industries** – Raphael Steffes.
 Website: <https://www.steffes.industries>
 
 Die Oberfläche trägt die Marke ebenfalls: das ChipShop-Logo sitzt im Header,
-die Steffes-Industries-Wortmarke mit Verweis auf die Website im Footer.
+das Steffes-Industries-Logo mit Verweis auf die Website im Footer. Beide
+Logodateien stammen aus dem offiziellen Bestand (PR/Logo): schwarz
+`STEFFES INDUSTRIES LOGO_Schmal.png`, weiß `STEFFES INDUSTRIES LOGO_Weiß.png`,
+zugeschnitten und freigestellt.
 
 ## Lizenz
 

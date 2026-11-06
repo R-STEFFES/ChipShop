@@ -24,9 +24,13 @@ Erster veröffentlichter Stand.
   (1024×512) im Steffes-Industries-Stil: schwarz, weiße kursive Wortmarke mit
   Überstrich und Speed-Slash, Cyan #00E5FF.
 - Markenauftritt durchgezogen: ChipShop-Lockup im Header der Oberfläche,
-  kleine Steffes-Industries-Wortmarke mit Link auf www.steffes.industries im
-  Footer, Favicon aus dem STI-Monogramm, Autorenzeile im Banner, eigener
+  kleines Steffes-Industries-Logo mit Link auf www.steffes.industries im
+  Footer, Favicon aus dem ChipShop-Die-Symbol, Autorenzeile im Banner, eigener
   README-Abschnitt mit Screenshot.
+- Steffes-Industries-Logo korrigiert: statt der zuvor verwendeten Marke jetzt
+  das offizielle Logo aus dem PR-Bestand – „STEFFES" aufrecht mit Unterstrich,
+  „INDUSTRIES" kursiv mit Überstrich (`STEFFES INDUSTRIES LOGO_Schmal.png`
+  schwarz, `..._Weiß.png` weiß). Banner, README und Footer entsprechend neu.
 - `[hidden] { display: none !important; }` in `style.css`: das Build-Panel ist
   jetzt wirklich versteckt, solange kein Build läuft (`display: flex` hatte das
   `hidden`-Attribut zuvor überschrieben).
