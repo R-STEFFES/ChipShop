@@ -15,128 +15,354 @@
          alt="ChipShop" width="196" height="52">
     <div>
       <h1>Chipyard&nbsp;Konfigurator</h1>
-      <p class="sub">Kerne und Module w&auml;hlen &rarr; Layout sch&auml;tzen &rarr; Verilog erzeugen</p>
+      <p class="sub">Chip zusammenstellen &rarr; sch&auml;tzen &rarr; bauen &rarr; simulieren</p>
     </div>
+  </div>
+  <div class="header-actions">
+    <button id="btn-help" class="btn btn-ghost" type="button">Hilfe</button>
+    <button id="btn-settings" class="btn btn-ghost" type="button">Einstellungen</button>
+    <button id="btn-save-project" class="btn btn-ghost" type="button">Projekt speichern</button>
+    <button id="btn-load-project" class="btn btn-ghost" type="button">Projekt laden</button>
+    <input id="project-file" type="file" accept="application/json,.json" hidden>
   </div>
   <div class="chipyard-info" id="chipyard-info">
     <span class="loading">Chipyard wird geladen ...</span>
   </div>
 </header>
 
+<section class="settings-panel" id="settings-panel" hidden aria-label="Einstellungen">
+  <label for="theme">Farbschema</label>
+  <select id="theme"></select>
+  <span class="hint">Wird in diesem Browser gespeichert.</span>
+</section>
+
 <main class="layout">
 
-  <!-- ================= Spalte 1: Konfiguration ================= -->
+  <!-- ============== Spalte 1: Chip zusammenstellen ============== -->
   <section class="col col-config">
-    <h2>1&nbsp;&middot;&nbsp;Grundkonfiguration</h2>
-
-    <h3>Schnellvorlagen</h3>
-    <div class="preset-row" id="preset-row"></div>
-
-    <div class="field">
-      <label for="cores">Anzahl Kerne</label>
-      <div class="slider-row">
-        <input type="range" id="cores" min="1" max="16" value="1" step="1">
-        <input type="number" id="cores-num" min="1" max="16" value="1">
-      </div>
-      <p class="hint" id="cores-hint"></p>
+    <div class="col-head">
+      <h2><span class="step">1</span> Chip zusammenstellen</h2>
+      <p class="col-sub">Was soll auf dem Chip sitzen? Alles hier landet im
+        generierten Verilog.</p>
     </div>
 
-    <div class="field">
-      <label for="core-type">Kerntyp</label>
-      <select id="core-type"></select>
-      <p class="hint" id="core-type-hint"></p>
+    <div class="col-body">
+
+      <div class="block">
+        <h3>Schnellstart</h3>
+        <div class="preset-row" id="preset-row"></div>
+        <p class="help">Eine Vorlage setzt alle Felder sinnvoll. Danach kannst
+          du alles einzeln &auml;ndern.</p>
+      </div>
+
+      <div class="block">
+        <div class="field-head">
+          <h3>Prozessorkerne</h3>
+          <span class="core-total" id="core-total">1 / 64</span>
+        </div>
+        <div class="core-list" id="core-list"></div>
+        <button id="btn-add-core" class="btn btn-small" type="button">+ Kerntyp hinzuf&uuml;gen</button>
+        <p class="hint" id="cores-hint">Bis zu 64 Kerne, auch gemischte Typen.</p>
+        <p class="help">Rocket und CVA6 sind sparsame In-Order-Kerne, BOOM und
+          VexiiRiscv sind schnelle Out-of-Order-Kerne. <b>Ibex</b> ist ein
+          Mikrocontroller-Kern (RV32, wie im Raspberry Pi Pico 2) und kann
+          kein Linux.</p>
+      </div>
+
+      <div class="block">
+        <div class="field-head">
+          <h3>Ziel: Linux</h3>
+          <label class="switch" title="Linux-Betriebssystem unterstützen">
+            <input type="checkbox" id="linux-target">
+            <span class="switch-track"></span>
+            <span class="switch-label" id="linux-state">aus</span>
+          </label>
+        </div>
+        <div class="linux-status" id="linux-status"></div>
+        <div class="recs" id="recommendations"></div>
+        <p class="help">Prüft, ob der Chip Linux booten könnte (RV64-Kerne,
+          L3, DRAM, Konsole, Block-Gerät, Boot-Flash) und schlägt fehlende
+          Bausteine vor. Der Schalter selbst ändert nichts am Verilog – er
+          zeigt nur, was für Linux fehlt.</p>
+      </div>
+
+      <div class="block">
+        <div class="field">
+          <label for="pdk">Fertigung (PDK)</label>
+          <select id="pdk"></select>
+          <p class="hint" id="pdk-hint"></p>
+        </div>
+        <p class="help">Der Fertigungsprozess bestimmt Takt, Fl&auml;che und
+          Kosten. Kleine Zahlen (7&nbsp;nm) hei&szlig;en: kleiner, schneller,
+          aber nur mit teurer Foundry.</p>
+      </div>
+
+      <div class="block">
+        <div class="field-head">
+          <h3>L3-Cache</h3>
+          <label class="switch" title="L3/LLC ein- oder ausschalten">
+            <input type="checkbox" id="l3-enabled" checked>
+            <span class="switch-track"></span>
+            <span class="switch-label" id="l3-state">an</span>
+          </label>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="l3">Gr&ouml;&szlig;e</label>
+            <select id="l3"></select>
+          </div>
+          <div class="field">
+            <label for="l3-ways">Assoziativit&auml;t</label>
+            <select id="l3-ways"></select>
+          </div>
+          <div class="field">
+            <label for="l3-banks">Banks</label>
+            <select id="l3-banks"></select>
+          </div>
+        </div>
+        <p class="hint" id="l3-hint"></p>
+        <p class="help">Der L3 (in Chipyard &bdquo;InclusiveCache&ldquo;/LLC
+          genannt) ist der gemeinsame Zwischenspeicher aller Kerne vor dem
+          DRAM. Aus = nur ein Koh&auml;renz-Hub, deutlich weniger Fl&auml;che,
+          aber mehr DRAM-Verkehr. Mehr Banks = mehr gleichzeitige Zugriffe.</p>
+      </div>
+
+      <div class="block">
+        <div class="field-head">
+          <h3>Grafik (GPU)</h3>
+          <span class="tag" id="gpu-tag">keine</span>
+        </div>
+        <div class="gpu-summary" id="gpu-summary">
+          <span class="muted">Keine GPU ausgew&auml;hlt.</span>
+        </div>
+        <div class="btn-row">
+          <button id="btn-gpu-pick" class="btn btn-small" type="button">GPU ausw&auml;hlen</button>
+          <button id="btn-gpu-clear" class="btn btn-small btn-ghost" type="button">Entfernen</button>
+        </div>
+        <p class="help">Integrierte GPU oder Beschleuniger als eigener Block
+          auf dem Die. <b>Wichtig:</b> In diesem Chipyard-Checkout gibt es
+          keinen GPU-Generator &ndash; die GPU z&auml;hlt zu Fl&auml;che,
+          Leistung und Layout, landet aber nicht im Verilog.</p>
+      </div>
+
+      <div class="block">
+        <div class="field-head">
+          <h3>NPU (KI-Beschleuniger)</h3>
+          <label class="switch" title="NPU ein- oder ausschalten">
+            <input type="checkbox" id="npu-enabled">
+            <span class="switch-track"></span>
+            <span class="switch-label" id="npu-state">aus</span>
+          </label>
+        </div>
+        <div class="field">
+          <label for="npu">Gr&ouml;&szlig;e / Typ</label>
+          <select id="npu"></select>
+        </div>
+        <p class="hint" id="npu-hint"></p>
+        <p class="help">Matrix-/KI-Beschleuniger direkt am Kern: <b>Gemmini</b>
+          (16&times;16 oder 32&times;32 systolisches Array) oder <b>NVDLA</b>
+          (CNN-Beschleuniger von NVIDIA). Beide werden als echtes Chipyard-
+          Fragment gebaut; gr&ouml;&szlig;ere Varianten kosten Fl&auml;che und
+          Build-Zeit.</p>
+      </div>
+
+      <div class="block">
+        <h3>Module</h3>
+        <div id="modules"></div>
+        <p class="help">Grau = steckt schon im Basis-Config. Gr&uuml;n = wird
+          beim Bauen erg&auml;nzt. Orange = nur Sch&auml;tzung (kein Fragment
+          in diesem Checkout).</p>
+      </div>
+
+      <details class="advanced">
+        <summary>Erweitert</summary>
+        <div class="field">
+          <label for="rocc">RoCC-Demo-Beschleuniger (Akkumulator)</label>
+          <input type="number" id="rocc" min="0" max="8" value="0">
+          <p class="hint">Jeder Beschleuniger belegt einen Hart.</p>
+        </div>
+        <div class="field">
+          <label for="activity">Aktivit&auml;t (Anteil aktiver Logik)</label>
+          <input type="number" id="activity" min="0.1" max="1" step="0.05" value="1">
+        </div>
+        <div class="field">
+          <label for="cycles">Simulationsl&auml;nge [Mio. Zyklen]</label>
+          <input type="number" id="cycles" min="1" step="10" value="50">
+        </div>
+        <div class="field">
+          <label for="jobs">Build-Parallelit&auml;t (-j)</label>
+          <input type="number" id="jobs" min="1" max="32" value="4">
+        </div>
+      </details>
     </div>
-
-    <div class="field">
-      <label for="pdk">Fertigungs-Preset (PDK)</label>
-      <select id="pdk"></select>
-      <p class="hint" id="pdk-hint"></p>
-    </div>
-
-    <div class="field">
-      <label for="l2">L2&nbsp;/&nbsp;LLC-Gr&ouml;&szlig;e</label>
-      <select id="l2"></select>
-    </div>
-
-    <h3>Module</h3>
-    <div id="modules"></div>
-
-    <details class="advanced">
-      <summary>Erweitert</summary>
-      <div class="field">
-        <label for="rocc">RoCC-Demo-Beschleuniger (Akkumulator)</label>
-        <input type="number" id="rocc" min="0" max="16" value="0">
-        <p class="hint">Jeder Beschleuniger belegt einen Hart.</p>
-      </div>
-      <div class="field">
-        <label for="activity">Aktivit&auml;t (Anteil aktiver Logik)</label>
-        <input type="number" id="activity" min="0.1" max="1" step="0.05" value="1">
-      </div>
-      <div class="field">
-        <label for="cycles">Simulationsl&auml;nge [Mio. Zyklen]</label>
-        <input type="number" id="cycles" min="1" step="10" value="50">
-      </div>
-      <div class="field">
-        <label for="jobs">Build-Parallelit&auml;t (-j)</label>
-        <input type="number" id="jobs" min="1" max="32" value="4">
-      </div>
-    </details>
   </section>
 
-  <!-- ================= Spalte 2: Layout + Schaetzung =========== -->
+  <!-- ============== Spalte 2: Layout ============== -->
   <section class="col col-layout">
-    <h2>2&nbsp;&middot;&nbsp;Vorab-Layout (grob)</h2>
-    <div class="floorplan-wrap">
-      <svg id="floorplan" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet"></svg>
-      <ul class="legend" id="legend"></ul>
+    <div class="col-head">
+      <h2><span class="step">2</span> So sieht der Chip aus</h2>
+      <p class="col-sub">Grobe Vorschau der Die-Fl&auml;che &ndash; vor dem
+        teuren Bauen.</p>
     </div>
-    <p class="hint" id="layout-summary">&ndash;</p>
+    <div class="col-body">
+      <div class="floorplan-wrap">
+        <svg id="floorplan" viewBox="0 0 440 440" preserveAspectRatio="xMidYMid meet"></svg>
+        <ul class="legend" id="legend"></ul>
+      </div>
+      <p class="hint" id="layout-summary">&ndash;</p>
 
-    <h2>3&nbsp;&middot;&nbsp;Sch&auml;tzung vor der Simulation</h2>
-    <div class="cards" id="cards"></div>
+      <div class="block explain">
+        <h3>In einfachen Worten</h3>
+        <ul id="plain-summary">
+          <li class="muted">Wird berechnet &hellip;</li>
+        </ul>
+      </div>
 
-    <details class="assumptions">
-      <summary>Annahmen der Sch&auml;tzung</summary>
-      <ul id="assumptions"></ul>
-    </details>
+      <div class="cards" id="cards"></div>
+      <div class="resource-warning" id="resource-warning" hidden role="status"></div>
+
+      <details class="assumptions">
+        <summary>Annahmen der Sch&auml;tzung</summary>
+        <ul id="assumptions"></ul>
+      </details>
+    </div>
   </section>
 
-  <!-- ================= Spalte 3: Verilog ======================= -->
+  <!-- ============== Spalte 3: Bauen + Simulieren ============== -->
   <section class="col col-build">
-    <h2>4&nbsp;&middot;&nbsp;Verilog erzeugen</h2>
-
-    <div class="target">
-      <span class="target-label">Ziel:</span>
-      <code id="target-path">&ndash;</code>
+    <div class="col-head">
+      <h2><span class="step">3</span> Bauen &amp; simulieren</h2>
+      <p class="col-sub">Verilog erzeugen (Minuten) oder direkt die echte
+        C++-Simulation starten.</p>
     </div>
 
-    <div class="btn-row">
-      <button id="btn-config" class="btn">Config anzeigen</button>
-      <button id="btn-write" class="btn">Config ablegen</button>
-      <button id="btn-build" class="btn btn-primary">Verilog bauen</button>
-    </div>
+    <div class="col-body">
 
-    <div class="warnings" id="warnings" hidden></div>
+      <div class="block">
+        <h3>Verilog erzeugen</h3>
+        <div class="target">
+          <span class="target-label">Ziel:</span>
+          <code id="target-path">&ndash;</code>
+        </div>
+        <div class="btn-row">
+          <button id="btn-config" class="btn">Config anzeigen</button>
+          <button id="btn-write" class="btn">Config ablegen</button>
+          <button id="btn-build" class="btn btn-primary">Verilog bauen</button>
+        </div>
+        <p class="help">Erzeugt die fertigen RTL-Dateien (SystemVerilog) aus
+          deiner Konfiguration. Das ist der erste Schritt jeder Simulation.</p>
+        <div class="warnings" id="warnings" hidden></div>
+        <pre class="code" id="config-source" hidden></pre>
 
-    <pre class="code" id="config-source" hidden></pre>
-
-    <div class="build-panel" id="build-panel" hidden>
-      <div class="build-head">
-        <span class="badge" id="build-badge">-</span>
-        <span id="build-phase"></span>
-        <span class="spacer"></span>
-        <span id="build-elapsed"></span>
+        <div class="build-panel" id="build-panel" hidden>
+          <div class="build-head">
+            <span class="badge" id="build-badge">-</span>
+            <span id="build-phase"></span>
+            <span class="spacer"></span>
+            <span id="build-elapsed"></span>
+          </div>
+          <div class="build-diagnostic" id="build-diagnostic" hidden>
+            <strong>Fehleranalyse</strong>
+            <p><b>Was passiert ist:</b> <span id="build-error-reason"></span></p>
+            <p><b>Wo:</b> <span id="build-error-location"></span></p>
+            <p><b>Nächster Schritt:</b> <span id="build-error-hint"></span></p>
+          </div>
+          <pre class="log" id="build-log"></pre>
+          <div class="btn-row">
+            <a id="btn-zip" class="btn btn-primary" hidden>ZIP herunterladen</a>
+            <button id="btn-cancel-view" class="btn" hidden>Ausblenden</button>
+          </div>
+          <ul class="file-list" id="file-list"></ul>
+        </div>
       </div>
-      <pre class="log" id="build-log"></pre>
-      <div class="btn-row">
-        <a id="btn-zip" class="btn btn-primary" hidden>Verilog-ZIP herunterladen</a>
-        <button id="btn-cancel-view" class="btn" hidden>Ausblenden</button>
-      </div>
-      <ul class="file-list" id="file-list"></ul>
-    </div>
 
-    <h3>Fr&uuml;here L&auml;ufe</h3>
-    <ul class="job-list" id="job-list"><li class="muted">noch keine</li></ul>
+      <div class="block sim-block">
+        <div class="field-head">
+          <h3>Simulation (C++ / Verilator)</h3>
+          <span class="tag gen">echte Chipyard-Simulation</span>
+        </div>
+        <p class="help">Baut den C++-Simulator aus deinem Chip und f&uuml;hrt
+          ein echtes RISC-V-Programm darauf aus. Das ist dieselbe Simulation
+          wie <code>make -C sims/verilator</code> in Chipyard.</p>
+
+        <div class="field-head sub-head">
+          <b>Simulationspartner</b>
+          <span class="tag base">nicht Teil des ASIC</span>
+        </div>
+        <p class="help">Diese Module sitzen im TestHarness um den Chip herum:
+          DRAM, UART, Debug, Flash. Sie werden mitgebaut, geh&ouml;ren aber
+          nicht zum Chip-Die.</p>
+        <div id="sim-partners" class="mod-list-compact"></div>
+
+        <div class="grid-2 sim-dram">
+          <div class="field">
+            <label for="dram-model">DRAM-Modell</label>
+            <select id="dram-model"></select>
+          </div>
+          <div class="field">
+            <label for="dram-size">DRAM-Gr&ouml;&szlig;e</label>
+            <select id="dram-size"></select>
+          </div>
+          <div class="field">
+            <label for="dram-latency">Extra-Latenz (Zyklen)</label>
+            <input type="number" id="dram-latency" min="0" max="64" value="0">
+          </div>
+        </div>
+        <p class="hint" id="dram-hint"></p>
+
+        <div class="field">
+          <label for="workload">Programm (RISC-V-Binary)</label>
+          <select id="workload"></select>
+          <input type="text" id="workload-path" class="text-input"
+                 placeholder="/pfad/zu/programm.riscv">
+          <p class="hint">Aus der Liste w&auml;hlen oder einen eigenen Pfad
+            eintragen. Eigene Programme mit der RISC-V-Toolchain bauen.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="sim-flags">Plusargs</label>
+            <input type="text" id="sim-flags" class="text-input"
+                   placeholder="+verbose">
+          </div>
+          <div class="field">
+            <label for="sim-timeout">Zeitlimit (Sekunden)</label>
+            <input type="number" id="sim-timeout" min="10" value="3600">
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button id="btn-sim-build" class="btn">Simulator bauen</button>
+          <button id="btn-sim-run" class="btn btn-primary">Simulation starten</button>
+        </div>
+
+        <div class="build-panel" id="sim-panel" hidden>
+          <div class="build-head">
+            <span class="badge" id="sim-badge">-</span>
+            <span id="sim-phase"></span>
+            <span class="spacer"></span>
+            <span id="sim-elapsed"></span>
+          </div>
+          <div class="build-diagnostic" id="sim-diagnostic" hidden>
+            <strong>Fehleranalyse</strong>
+            <p><b>Was passiert ist:</b> <span id="sim-error-reason"></span></p>
+            <p><b>Wo:</b> <span id="sim-error-location"></span></p>
+            <p><b>Nächster Schritt:</b> <span id="sim-error-hint"></span></p>
+          </div>
+          <pre class="log" id="sim-log"></pre>
+          <div class="btn-row">
+            <a id="sim-zip" class="btn" hidden>Ausgabe-ZIP</a>
+            <button id="btn-sim-hide" class="btn btn-ghost" hidden>Ausblenden</button>
+          </div>
+          <ul class="file-list" id="sim-files"></ul>
+        </div>
+      </div>
+
+      <div class="block">
+        <h3>Fr&uuml;here L&auml;ufe</h3>
+        <ul class="job-list" id="job-list"><li class="muted">noch keine</li></ul>
+      </div>
+    </div>
   </section>
 
 </main>
@@ -150,11 +376,63 @@
            alt="Steffes Industries" height="19">
     </a>
     <span class="powered-text">
-      Raphael Steffes &middot;
+      Germany &middot;
       <a href="https://www.steffes.industries" target="_blank" rel="noopener">www.steffes.industries</a>
     </span>
   </div>
 </footer>
+
+<!-- ==================== GPU-Auswahlfenster ==================== -->
+<dialog id="gpu-dialog" class="modal">
+  <form method="dialog" class="modal-card">
+    <div class="modal-head">
+      <h2>GPU ausw&auml;hlen</h2>
+      <p class="modal-sub">Eine GPU pro Chip. Fl&auml;che wird mit dem
+        gew&auml;hlten Prozess skaliert.</p>
+    </div>
+    <div class="gpu-grid" id="gpu-grid"></div>
+    <div class="modal-foot">
+      <span class="hint" id="gpu-dialog-hint"></span>
+      <span class="spacer"></span>
+      <button class="btn" value="cancel" type="submit">Abbrechen</button>
+      <button class="btn btn-primary" id="btn-gpu-apply" value="apply" type="submit">GPU &uuml;bernehmen</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ==================== Hilfe ==================== -->
+<dialog id="help-dialog" class="modal">
+  <form method="dialog" class="modal-card">
+    <div class="modal-head">
+      <h2>So funktioniert ChipShop</h2>
+      <p class="modal-sub">In f&uuml;nf Schritten zum eigenen Chip.</p>
+    </div>
+    <ol class="help-steps">
+      <li><b>Zusammenstellen:</b> links Kerne, Fertigung, L3-Cache, GPU und
+        Module w&auml;hlen. Jede &Auml;nderung rechnet die Sch&auml;tzung neu.</li>
+      <li><b>Anschauen:</b> in der Mitte siehst du Die-Fl&auml;che, Leistung,
+        Wafer-Ausbeute und wie lange Bau und Simulation dauern.</li>
+      <li><b>Verilog bauen:</b> rechts &bdquo;Verilog bauen&ldquo; erzeugt die
+        RTL-Dateien &uuml;ber Chipyard (<code>make verilog</code>) &ndash;
+        das dauert Minuten.</li>
+      <li><b>Simulieren:</b> Simulationspartner w&auml;hlen (DRAM, UART,
+        Debug &hellip;), Programm ausw&auml;hlen und
+        &bdquo;Simulation starten&ldquo;. Es l&auml;uft die echte C++-
+        Simulation aus Chipyard.</li>
+      <li><b>Ergebnisse:</b> Logs und Dateien stehen im jeweiligen Panel,
+        fr&uuml;here L&auml;ufe unten in der Liste.</li>
+    </ol>
+    <p class="help"><b>Ehrlich gesagt:</b> Fl&auml;che, Leistung und
+      Ausbeute sind Gr&ouml;&szlig;enordnungen, keine Vorhersagen. Eine GPU
+      und Module mit dem Etikett &bdquo;nur Sch&auml;tzung&ldquo; landen
+      nicht im Verilog, weil es daf&uuml;r in diesem Checkout kein
+      Chipyard-Fragment gibt.</p>
+    <div class="modal-foot">
+      <span class="spacer"></span>
+      <button class="btn btn-primary" value="close" type="submit">Alles klar</button>
+    </div>
+  </form>
+</dialog>
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

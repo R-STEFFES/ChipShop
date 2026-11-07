@@ -20,6 +20,7 @@ import shutil
 import zipfile
 import threading
 import traceback
+import re
 
 from flask import Flask, jsonify, request, send_file, render_template
 
@@ -44,11 +45,30 @@ def spec_from_request() -> dict:
     data = request.get_json(silent=True) or {}
     spec = dict(estimator.catalog()["defaults"])
     spec.update({k: v for k, v in data.items() if v is not None})
+    # Altformat: "l2_kib" war die Groesse des gemeinsamen Caches und ist
+    # heute die L3/LLC-Angabe. Alte Projektdateien sollen weiter funktionieren.
+    if data.get("l2_kib") is not None and data.get("l3_kib") is None:
+        spec["l3_kib"] = int(data["l2_kib"])
     # Module immer als Liste von Strings
     mods = spec.get("modules") or []
     if isinstance(mods, str):
         mods = [mods]
-    spec["modules"] = [str(m) for m in mods]
+    mods = [str(m) for m in mods]
+    # Altes Projekt: Gemmini war eine Checkbox, heute ist es die NPU-Auswahl.
+    if "gemmini" in mods:
+        mods = [m for m in mods if m != "gemmini"]
+        if not spec.get("npu_enabled"):
+            spec["npu_enabled"] = True
+            spec["npu_id"] = "gemmini_16"
+    spec["modules"] = mods
+    spec["npu_enabled"] = bool(spec.get("npu_enabled"))
+    if spec["npu_enabled"] and spec.get("npu_id") not in {
+            n["id"] for n in estimator.NPUS}:
+        spec["npu_id"] = estimator.NPUS[0]["id"]
+    partners = spec.get("sim_partners") or []
+    if isinstance(partners, str):
+        partners = [partners]
+    spec["sim_partners"] = [str(p) for p in partners]
     return spec
 
 
@@ -72,6 +92,76 @@ def read_json(path: str, default=None):
         return default
 
 
+def host_memory_gb():
+    """Physischer RAM des Rechners, auf dem Flask/Chipyard laufen."""
+    try:
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        pages = os.sysconf("SC_PHYS_PAGES")
+        if page_size > 0 and pages > 0:
+            return page_size * pages / (1024 ** 3)
+    except (AttributeError, OSError, ValueError):
+        pass
+    try:
+        with open("/proc/meminfo") as fh:
+            for line in fh:
+                if line.startswith("MemTotal:"):
+                    return int(line.split()[1]) / (1024 ** 2)
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
+def diagnose_build_failure(log: str, phase: str) -> dict:
+    """Leitet eine vorsichtige, quelltextbezogene Diagnose aus dem Log ab."""
+    lines = [line.strip() for line in (log or "").splitlines() if line.strip()]
+    text = "\n".join(lines)
+    lowered = text.lower()
+    location = "Phase: %s" % (phase or "unbekannt")
+
+    memory_markers = (
+        "outofmemoryerror", "oom-kill", "out of memory", "killed process",
+        "cannot allocate memory", "memoryerror",
+    )
+    if any(marker in lowered for marker in memory_markers) or re.search(
+            r"(?m)^\s*killed\s*$", lowered):
+        line = next((item for item in lines if any(
+            marker in item.lower() for marker in memory_markers) or
+            item.lower().strip() == "killed"), "Speichermangel im Build-Log")
+        return dict(
+            reason="Der Build-Prozess ist sehr wahrscheinlich wegen Speichermangels beendet worden: %s" % line,
+            location="Build-Phase (Scala/FIRRTL oder Verilog-Kompilierung)",
+            suggestion="Weniger Build-Parallelität (-j) wählen, andere speicherintensive Programme schließen oder mehr RAM/Swap bereitstellen.",
+        )
+
+    error_lines = [line for line in lines if re.search(
+        r"\[error\]|\berror:|compilation failed|exception", line, re.IGNORECASE)]
+    if error_lines:
+        first_error = error_lines[0]
+        source = re.search(r"([^\s:/\\]+\.(?:scala|java|sv|v)):(\d+)", first_error)
+        if source:
+            location = "%s:%s" % (source.group(1), source.group(2))
+        elif "scala" in first_error.lower() or "firrtl" in first_error.lower():
+            location = "Scala/FIRRTL-Kompilierung"
+        return dict(
+            reason=first_error[:600],
+            location=location,
+            suggestion="Die erste konkrete Fehlermeldung im Build-Log prüfen; spätere make-Fehler sind häufig nur Folgefehler.",
+        )
+
+    if any(marker in lowered for marker in ("command not found", "no such file or directory")):
+        return dict(
+            reason="Ein benötigtes Programm oder eine Build-Datei wurde nicht gefunden.",
+            location="Build-Umgebung / Tool-Aufruf",
+            suggestion="Chipyard-Conda-Umgebung sowie verilator und firtool prüfen.",
+        )
+
+    return dict(
+        reason="Der Build ist fehlgeschlagen; das Log enthält keine automatisch erkannte Ursache.",
+        location=location,
+        suggestion="Im Log nach der ersten Fehlermeldung oberhalb des abschließenden make-Fehlers suchen.",
+    )
+
+
 # --------------------------------------------------------------------------
 # Seiten
 # --------------------------------------------------------------------------
@@ -88,11 +178,26 @@ def index():
 @app.route("/api/catalog")
 def api_catalog():
     cat = estimator.catalog()
-    cat["chipyard"] = generator.chipyard_info(generator.CHIPYARD_ROOT)
+    info = generator.chipyard_info(generator.CHIPYARD_ROOT)
+    info["simulator"] = generator.simulator_path(generator.CHIPYARD_ROOT)
+    info["simulator_built"] = generator.simulator_built(
+        generator.CHIPYARD_ROOT)
+    info["sim_binary"] = generator.SIM_BINARY
+    cat["chipyard"] = info
     cat["config_class"] = generator.CONFIG_CLASS
     cat["config_path"] = os.path.join(generator.CHIPYARD_ROOT,
                                       generator.CONFIG_REL)
+    cat["host_memory_gb"] = host_memory_gb()
     return jsonify(cat)
+
+
+@app.route("/api/workloads")
+def api_workloads():
+    """Fertige RISC-V-Programme im Checkout (Auswahl fuer die Simulation)."""
+    root = request.args.get("root") or generator.CHIPYARD_ROOT
+    items = generator.list_workloads(root)
+    return jsonify(ok=True, workloads=items, root=root)
+
 
 
 # --------------------------------------------------------------------------
@@ -175,14 +280,19 @@ def _run_job(job_id: str, spec: dict, root: str, jobs: int):
                                   "generated-src-Verzeichnis wurden keine "
                                   "Verilog-Dateien gefunden (%s)."
                                   % info.get("source_dir"))
+                state["diagnostic"] = diagnose_build_failure(
+                    "Keine Verilog-Dateien im erwarteten generated-src-Verzeichnis.",
+                    "collect")
         else:
             state["phase"] = "done"
             state["status"] = "failed"
             state["error"] = "make verilog endete mit Code %d" % rc
+            state["diagnostic"] = diagnose_build_failure(tail(log_path, 500), "build")
     except Exception as exc:                       # pragma: no cover
         state["status"] = "failed"
         state["error"] = str(exc)
         state["trace"] = traceback.format_exc()
+        state["diagnostic"] = diagnose_build_failure(state["trace"], state.get("phase"))
         with open(log_path, "a") as fh:
             fh.write("\n::EXCEPTION::\n" + traceback.format_exc())
     finally:
@@ -218,13 +328,176 @@ def api_build():
     os.makedirs(d, exist_ok=True)
 
     with JOBS_LOCK:
-        JOBS[job_id] = dict(id=job_id, status="running", phase="prepare",
+        JOBS[job_id] = dict(id=job_id, kind="verilog", status="running",
+                            phase="prepare",
                             started=time.time(), finished=None, error=None,
                             returncode=None, dir=d, root=root, jobs=jobs,
                             spec=spec, verilog=None)
 
     th = threading.Thread(target=_run_job, args=(job_id, spec, root, jobs),
                           daemon=True)
+    th.start()
+    return jsonify(ok=True, job=JOBS[job_id])
+
+
+# --------------------------------------------------------------------------
+# API: C++-Simulation (Hintergrund)
+# --------------------------------------------------------------------------
+
+def _run_sim_job(job_id: str, spec: dict, root: str, jobs: int, cfg: dict):
+    """Baut den C++-Simulator und startet damit das gewaehlte Programm."""
+    d = job_dir(job_id)
+    log_path = os.path.join(d, "sim.log")
+    state = JOBS[job_id]
+    try:
+        rendered = generator.render_config(spec)
+        with open(os.path.join(d, "config.scala"), "w") as fh:
+            fh.write(rendered["source"])
+        with open(os.path.join(d, "spec.json"), "w") as fh:
+            json.dump(spec, fh, indent=2)
+        config_changed = generator.config_would_change(root,
+                                                       rendered["source"])
+        generator.write_config(root, rendered["source"])
+
+        state["phase"] = "compile"
+        state["sim_binary"] = generator.simulator_path(root)
+        if not config_changed and generator.simulator_built(root):
+            # Design unveraendert und Simulator vorhanden: make wuerde nur
+            # pruefen. Das spart Minuten (besonders bei NVDLA).
+            state["compile_skipped"] = True
+            state["compile_returncode"] = 0
+        else:
+            rc = generator.build_simulator(root, log_path, jobs=jobs)
+            state["compile_returncode"] = rc
+            if rc != 0:
+                state["phase"] = "done"
+                state["status"] = "failed"
+                state["error"] = ("Der C++-Simulator konnte nicht gebaut "
+                                  "werden (Code %d)." % rc)
+                state["diagnostic"] = diagnose_build_failure(
+                    tail(log_path, 600), "compile")
+                return
+        state["simulator_ready"] = generator.simulator_built(root)
+        if cfg.get("run") and not state["simulator_ready"]:
+            state["phase"] = "done"
+            state["status"] = "failed"
+            state["error"] = ("Es gibt noch keinen C++-Simulator fuer diese "
+                              "Konfiguration. Bitte zuerst 'Simulator bauen'.")
+            return
+        if not cfg.get("run"):
+            state["phase"] = "done"
+            state["status"] = "done"
+            return
+
+        state["phase"] = "run"
+        state["workload"] = cfg["workload"]
+        run_started = time.time()
+        rc = generator.run_simulation(root, cfg["workload"], log_path,
+                                      sim_flags=cfg.get("sim_flags", ""),
+                                      timeout_s=cfg.get("timeout_s", 3600),
+                                      jobs=jobs)
+        run_seconds = time.time() - run_started
+        state["exit_code"] = rc
+        state["run_seconds"] = run_seconds
+        state["phase"] = "collect"
+        info = generator.collect_sim_output(root, os.path.join(d, "sim-output"))
+        state["sim_output"] = info
+        state["phase"] = "done"
+        timed_out = rc != 0 and run_seconds >= (cfg.get("timeout_s", 3600) - 2)
+        if rc == 0:
+            state["status"] = "done"
+        elif rc == 124 or timed_out:
+            state["status"] = "failed"
+            state["error"] = ("Die Simulation hat das Zeitlimit von %d s "
+                              "erreicht und wurde beendet."
+                              % int(cfg.get("timeout_s", 3600)))
+            state["diagnostic"] = dict(
+                reason="Zeitlimit erreicht (timeout, Code %s)." % rc,
+                location="Phase: Simulation",
+                suggestion="Simulationslaenge verkleinern, schnelleres "
+                           "DRAM-Modell (SimAXIMem) waehlen oder das Limit "
+                           "erhoehen.")
+        else:
+            state["status"] = "failed"
+            state["error"] = "Simulation endete mit Code %d." % rc
+            state["diagnostic"] = diagnose_build_failure(
+                tail(log_path, 600), "run")
+            if rc < 0 or not state["diagnostic"].get("reason") or \
+                    "keine automatisch erkannte Ursache" in \
+                    state["diagnostic"].get("reason", ""):
+                state["diagnostic"] = dict(
+                    reason=("Das Programm wurde beendet, ohne sich "
+                            "ordnungsgemäß zu verabschieden (Code %d)." % rc),
+                    location="Phase: Simulation (C++-Simulator)",
+                    suggestion="Prüfen, ob das Programm zum Chip passt "
+                               "(RV64GC, passende ISA-Erweiterungen), und "
+                               "den Log-Ausschnitt oberhalb des letzten "
+                               "make-Fehlers lesen.")
+    except Exception as exc:                       # pragma: no cover
+        state["status"] = "failed"
+        state["error"] = str(exc)
+        state["trace"] = traceback.format_exc()
+        state["diagnostic"] = diagnose_build_failure(state["trace"],
+                                                     state.get("phase"))
+        with open(log_path, "a") as fh:
+            fh.write("\n::EXCEPTION::\n" + traceback.format_exc())
+    finally:
+        state["finished"] = time.time()
+        try:
+            with open(os.path.join(d, "state.json"), "w") as fh:
+                json.dump({k: v for k, v in state.items()}, fh, indent=2)
+        except OSError:
+            pass
+
+
+@app.route("/api/simulate", methods=["POST"])
+def api_simulate():
+    spec = spec_from_request()
+    data = request.get_json(silent=True) or {}
+    root = data.get("chipyard_root") or generator.CHIPYARD_ROOT
+    jobs = max(1, min(int(data.get("jobs") or 4), 32))
+    do_run = bool(data.get("run", True))
+    workload = (data.get("workload") or "").strip()
+    sim_flags = (data.get("sim_flags") or "").strip()
+    timeout_s = int(data.get("timeout_s") or 3600)
+    timeout_s = max(10, min(timeout_s, 24 * 3600))
+
+    if not os.path.isdir(root):
+        return jsonify(ok=False, error="Chipyard-Verzeichnis nicht gefunden: %s"
+                       % root), 400
+    if not generator.conda_available():
+        return jsonify(ok=False, error=(
+            "Conda-Umgebung nicht gefunden (%s / %s). Ohne sie kann keine "
+            "Simulation gebaut werden." %
+            (generator.CONDA_SH, generator.CHIPYARD_ENV))), 400
+    if do_run:
+        if not workload:
+            return jsonify(ok=False, error="Bitte ein Programm "
+                                           "(RISC-V-Binary) auswaehlen."), 400
+        if not os.path.isfile(workload):
+            return jsonify(ok=False, error="Programm nicht gefunden: %s"
+                           % workload), 400
+        if workload.lower().endswith((".dump", ".py", ".c", ".h", ".sh",
+                                      ".json", ".md", ".txt")):
+            return jsonify(ok=False, error=(
+                "Das ist kein RISC-V-Programm (nur .riscv/.elf/.hex oder "
+                "fertige ISA-Tests ohne Endung).")), 400
+
+    job_id = time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6]
+    d = job_dir(job_id)
+    os.makedirs(d, exist_ok=True)
+    cfg = dict(run=do_run, workload=workload, sim_flags=sim_flags,
+               timeout_s=timeout_s)
+
+    with JOBS_LOCK:
+        JOBS[job_id] = dict(id=job_id, kind="sim", status="running",
+                            phase="prepare", started=time.time(),
+                            finished=None, error=None, exit_code=None,
+                            dir=d, root=root, jobs=jobs, spec=spec,
+                            sim_cfg=cfg, sim_output=None)
+
+    th = threading.Thread(target=_run_sim_job,
+                          args=(job_id, spec, root, jobs, cfg), daemon=True)
     th.start()
     return jsonify(ok=True, job=JOBS[job_id])
 
@@ -237,7 +510,8 @@ def api_build_status(job_id):
         if state is None:
             return jsonify(ok=False, error="Unbekannter Job %s" % job_id), 404
     out = dict(state)
-    out["log_tail"] = tail(os.path.join(job_dir(job_id), "build.log"), 80)
+    log_name = "sim.log" if state.get("kind") == "sim" else "build.log"
+    out["log_tail"] = tail(os.path.join(job_dir(job_id), log_name), 120)
     out["elapsed_s"] = (state.get("finished") or time.time()) - \
         state.get("started", time.time())
     if state.get("status") in ("done", "failed") and \
@@ -258,6 +532,18 @@ def _verilog_dir(job_id: str) -> str:
     return os.path.join(job_dir(job_id), "verilog")
 
 
+def _sim_dir(job_id: str) -> str:
+    return os.path.join(job_dir(job_id), "sim-output")
+
+
+def _artifact_dir(job_id: str) -> str:
+    """Verzeichnis mit den erzeugten Dateien -- RTL oder Simulations-Ausgabe."""
+    state = _load_job(job_id) or {}
+    if state.get("kind") == "sim":
+        return _sim_dir(job_id)
+    return _verilog_dir(job_id)
+
+
 def _iter_files(base: str):
     """Alle Dateien unter base, mit relativen Pfaden (Schraegstriche)."""
     for dirpath, dirnames, filenames in os.walk(base):
@@ -273,21 +559,23 @@ def api_build_files(job_id):
     state = _load_job(job_id)
     if state is None:
         return jsonify(ok=False, error="Unbekannter Job"), 404
-    d = _verilog_dir(job_id)
+    d = _artifact_dir(job_id)
     files = []
     if os.path.isdir(d):
         files = [dict(name=rel, size=os.path.getsize(p))
                  for rel, p in _iter_files(d)]
     verilog = state.get("verilog") or {}
-    return jsonify(ok=True, files=files, dir=d,
+    sim_output = state.get("sim_output") or {}
+    return jsonify(ok=True, files=files, dir=d, kind=state.get("kind"),
                    source_dir=verilog.get("source_dir"),
                    rtl_files=verilog.get("rtl_files"),
-                   total_bytes=verilog.get("total_bytes"))
+                   total_bytes=(verilog.get("total_bytes") or
+                                sim_output.get("total_bytes")))
 
 
 @app.route("/api/build/<job_id>/file/<path:name>")
 def api_build_file(job_id, name):
-    d = _verilog_dir(job_id)
+    d = _artifact_dir(job_id)
     root = os.path.realpath(d)
     target = os.path.realpath(os.path.join(root, name))
     # Kein Ausbruch aus dem Job-Verzeichnis
@@ -301,9 +589,11 @@ def api_build_file(job_id, name):
 
 @app.route("/api/build/<job_id>/zip")
 def api_build_zip(job_id):
-    d = _verilog_dir(job_id)
+    d = _artifact_dir(job_id)
     if not os.path.isdir(d):
-        return jsonify(ok=False, error="Keine Verilog-Dateien vorhanden"), 404
+        return jsonify(ok=False, error="Keine Dateien vorhanden"), 404
+    state = _load_job(job_id) or {}
+    kind = state.get("kind", "verilog")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for rel, path in _iter_files(d):
@@ -315,8 +605,9 @@ def api_build_zip(job_id):
         if os.path.isfile(spec):
             zf.write(spec, "spec.json")
     buf.seek(0)
+    name = "chipyard-sim-%s.zip" if kind == "sim" else "chipyard-verilog-%s.zip"
     return send_file(buf, mimetype="application/zip", as_attachment=True,
-                     download_name="chipyard-verilog-%s.zip" % job_id)
+                     download_name=name % job_id)
 
 
 @app.route("/api/jobs")
@@ -333,16 +624,22 @@ def api_jobs():
             spec = st.get("spec") or read_json(os.path.join(d, "spec.json")) or {}
             items.append(dict(
                 id=name,
+                kind=st.get("kind", "verilog"),
                 status=st.get("status", "unbekannt"),
+                phase=st.get("phase"),
                 started=st.get("started"),
                 finished=st.get("finished"),
                 cores=spec.get("cores"),
                 core_type=spec.get("core_type"),
                 pdk=spec.get("pdk"),
+                workload=st.get("workload"),
+                exit_code=st.get("exit_code"),
                 error=st.get("error"),
                 has_verilog=os.path.isdir(os.path.join(d, "verilog")),
+                has_sim=os.path.isdir(os.path.join(d, "sim-output")),
             ))
     return jsonify(ok=True, jobs=items)
+
 
 
 # --------------------------------------------------------------------------
